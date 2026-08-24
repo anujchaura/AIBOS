@@ -1,0 +1,60 @@
+# ─── Environment ─────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+
+# ─── Node ────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Next.js ─────────────────────────────────────────────────
+frontend/.next/
+frontend/out/
+frontend/.vercel
+
+# ─── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+ai-services/.venv/
+ai-services/venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ─── Uploads ─────────────────────────────────────────────────
+uploads/
+*.pdf
+*.docx
+*.pptx
+*.xlsx
+*.csv
+
+# ─── Vector DB ────────────────────────────────────────────────
+chroma_data/
+.chroma/
+
+# ─── Logs ────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── OS ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE ─────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ─── Docker ──────────────────────────────────────────────────
+docker-compose.override.yml

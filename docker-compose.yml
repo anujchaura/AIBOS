@@ -1,0 +1,141 @@
+version: '3.9'
+
+services:
+  # ─── MongoDB ──────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: aibos-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: aibos
+      MONGO_INITDB_ROOT_PASSWORD: aibos_secret
+      MONGO_INITDB_DATABASE: aibos
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - aibos-network
+
+  # ─── Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: aibos-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - aibos-network
+
+  # ─── ChromaDB (Vector Store) ──────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: aibos-chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/.chroma/index
+    environment:
+      - CHROMA_SERVER_AUTHN_CREDENTIALS=
+      - ALLOW_RESET=true
+    networks:
+      - aibos-network
+
+  # ─── Express Backend API Gateway ─────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aibos-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file: .env
+    environment:
+      - MONGODB_URI=mongodb://aibos:aibos_secret@mongodb:27017/aibos
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai-services:8001
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - aibos-network
+
+  # ─── FastAPI AI Services ──────────────────────────────────
+  ai-services:
+    build:
+      context: ./ai-services
+      dockerfile: Dockerfile
+    container_name: aibos-ai-services
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URI=mongodb://aibos:aibos_secret@mongodb:27017/aibos
+    depends_on:
+      - chromadb
+      - redis
+      - mongodb
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - aibos-network
+
+  # ─── Celery Worker (Workflow Engine) ─────────────────────
+  celery-worker:
+    build:
+      context: ./ai-services
+      dockerfile: Dockerfile
+    container_name: aibos-celery-worker
+    restart: unless-stopped
+    command: celery -A workflow.celery_app worker --loglevel=info --concurrency=4
+    env_file: .env
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MONGODB_URI=mongodb://aibos:aibos_secret@mongodb:27017/aibos
+      - CHROMA_HOST=chromadb
+    depends_on:
+      - redis
+      - mongodb
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - aibos-network
+
+  # ─── Next.js Frontend ─────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aibos-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXT_PUBLIC_AI_SERVICE_URL=http://localhost:8001
+    depends_on:
+      - backend
+    networks:
+      - aibos-network
+
+volumes:
+  mongo_data:
+  redis_data:
+  chroma_data:
+
+networks:
+  aibos-network:
+    driver: bridge
