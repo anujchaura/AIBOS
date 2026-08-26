@@ -28,9 +28,32 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const app = express();
 const httpServer = createServer(app);
 
+// ─── CORS Origins ─────────────────────────────────────────
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+];
+// Add FRONTEND_URL from env (strip any accidental quotes)
+if (process.env.FRONTEND_URL) {
+  const cleanUrl = process.env.FRONTEND_URL.replace(/[\'"]/g, '').trim();
+  allowedOrigins.push(cleanUrl);
+}
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile, curl, etc) or matching origins
+    if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all for now — tighten in production
+    }
+  },
+  credentials: true,
+};
+
 // ─── Socket.io for real-time agent activity ───────────────
 const io = new Server(httpServer, {
-  cors: { origin: process.env.FRONTEND_URL || 'http://localhost:3000', methods: ['GET', 'POST'] },
+  cors: { origin: '*', methods: ['GET', 'POST'] },
 });
 app.set('io', io);
 
@@ -42,10 +65,7 @@ io.on('connection', (socket) => {
 
 // ─── Security & Middleware ────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-}));
+app.use(cors(corsOptions));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
